@@ -1,5 +1,18 @@
 const express=require('express'),session=require('express-session'),bcrypt=require('bcryptjs'),fs=require('fs'),path=require('path');
-const app=express(),PORT=process.env.PORT||3000,DB=path.join(__dirname,'data','db.json');
+const app=express(),PORT=process.env.PORT||3000;
+// CORS ni sozlash (Vercel domeni bilan ishlashi uchun)
+app.use((req, res, next) => {
+    // Vercel'dagi saytingiz manzilini yozing (oxirida / bo'lmasin) yoki sinov uchun '*' qo'ysའa ham bo'ladi
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+const DB = process.env.DB_PATH || path.join(__dirname, 'data', 'db.json');
 app.disable('x-powered-by');app.use(express.json({limit:'100kb'}));app.use(express.urlencoded({extended:false}));app.use(session({name:'ustatop.sid',secret:process.env.SESSION_SECRET||'local-demo-change-before-deploying',resave:false,saveUninitialized:false,cookie:{httpOnly:true,sameSite:'lax',secure:process.env.NODE_ENV==='production',maxAge:8*60*60*1000}}));
 const regions=['Toshkent shahri','Toshkent viloyati','Samarqand viloyati','Buxoro viloyati','Andijon viloyati',"Farg'ona viloyati",'Namangan viloyati','Qashqadaryo viloyati','Surxondaryo viloyati','Jizzax viloyati','Sirdaryo viloyati','Navoiy viloyati','Xorazm viloyati','Qoraqalpogʻiston Respublikasi'];
 const cities={ 'Toshkent shahri':['Toshkent'],'Toshkent viloyati':['Chirchiq','Olmaliq','Angren','Bekobod','Yangiyoʻl','Nurafshon','Ohangaron','Parkent'],'Samarqand viloyati':['Samarqand',"Kattaqo'rg'on",'Urgut','Jomboy'],'Buxoro viloyati':['Buxoro','Gʻijduvon','Qorakoʻl','Vobkent'],'Andijon viloyati':['Andijon','Asaka','Xonobod','Shahrixon'],"Farg'ona viloyati":['Fargʻona','Qoʻqon','Margʻilon','Rishton','Quvasoy'],'Namangan viloyati':['Namangan','Chust','Pop','Uchqoʻrgʻon'],'Qashqadaryo viloyati':['Qarshi','Shahrisabz','Kitob','Koson','Muborak'],'Surxondaryo viloyati':['Termiz','Denov','Boysun','Sherobod'],'Jizzax viloyati':['Jizzax','Doʻstlik','Zomin','Gʻallaorol'],'Sirdaryo viloyati':['Guliston','Yangiyer','Shirin','Sardoba'],'Navoiy viloyati':['Navoiy','Zarafshon','Uchquduq','Qiziltepa'],'Xorazm viloyati':['Urganch','Xiva','Pitnak','Hazorasp'],'Qoraqalpogʻiston Respublikasi':['Nukus','Beruniy','Toʻrtkoʻl','Xoʻjayli']};

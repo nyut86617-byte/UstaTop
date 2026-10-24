@@ -1,8 +1,108 @@
-const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=n=>new Intl.NumberFormat('uz-UZ').format(n)+" so'm";let all=[],trades=[],regions=[],cities={},visible=6;
-async function api(url,opts={}){let r=await fetch(url,{headers:{'Content-Type':'application/json'},...opts}),d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Xatolik yuz berdi');return d}
-function renderServices(){ $('#serviceGrid').innerHTML=trades.map(t=>`<button class="service-card" data-trade="${esc(t.key)}"><span class="service-icon">${t.icon}</span><h3>${esc(t.name)}</h3><p>${esc(t.desc)}</p></button>`).join('');$('#trade').innerHTML='<option value="">Barcha xizmatlar</option>'+trades.map(t=>`<option value="${esc(t.key)}">${esc(t.name)}</option>`).join('') }
-function cityOpts(){let reg=$('#region').value,arr=reg?(cities[reg]||[]):Object.values(cities).flat();$('#city').innerHTML='<option value="">Barcha shaharlar</option>'+[...new Set(arr)].sort().map(c=>`<option>${esc(c)}</option>`).join('')}
-function render(){let q=$('#q').value.toLocaleLowerCase('uz'),reg=$('#region').value,city=$('#city').value,trade=$('#trade').value,sort=$('#sort').value;let a=all.filter(m=>(!q||[m.name,m.tradeName,m.city,m.region].some(v=>String(v).toLocaleLowerCase('uz').includes(q)))&&(!reg||m.region===reg)&&(!city||m.city===city)&&(!trade||m.trade===trade));if(sort==='rating')a.sort((x,y)=>y.rating-x.rating);if(sort==='price')a.sort((x,y)=>x.price-y.price);if(sort==='experience')a.sort((x,y)=>y.experience-x.experience);$('#count').textContent=a.length+' ta usta topildi';$('#more').style.display=visible>=a.length?'none':'block';let shown=a.slice(0,visible);$('#masterGrid').innerHTML=shown.length?shown.map(m=>`<article class="master-card"><div class="master-top"><div class="master-avatar">${esc(m.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</div><div><h3 class="master-name">${esc(m.name)} ${m.verified?'✓':''}</h3><div class="master-trade">${esc(m.tradeName)}</div></div><div class="master-rating">★ ${Number(m.rating||0).toFixed(1)}</div></div><div class="master-location">⌖ ${esc(m.city)}, ${esc(m.region)}</div><div class="tags"><span class="tag">${m.experience} yil tajriba</span><span class="tag">${m.reviews||0} baho</span><span class="tag">${m.available?'Faol':'Band bo‘lishi mumkin'}</span></div><div class="price-row"><div class="price">${money(m.price)}<small>taxminiy narxdan</small></div><button class="btn btn-primary" data-order="${m.id}">Buyurtma →</button></div></article>`).join(''):'<div class="empty">Mos usta topilmadi. Filtrlarni o‘zgartirib ko‘ring.</div>'}
-function openOrder(id){let m=all.find(x=>x.id===+id);$('#masterId').value=m?.id||'';$('#modalTitle').textContent=m?m.name+'ga buyurtma':'Ustani chaqiring';$('#formMsg').textContent='';$('#modal').classList.add('open')}
-async function init(){try{let [t,r,m,site]=await Promise.all([api('/api/trades'),api('/api/regions'),api('/api/masters'),api('/api/site')]);trades=t;regions=r.regions;cities=r.cities;all=m.masters;renderServices();$('#region').innerHTML='<option value="">Barcha viloyatlar</option>'+regions.map(x=>`<option>${esc(x)}</option>`).join('');cityOpts();$('#heroMasterCount')&&($('#heroMasterCount').textContent=m.total);if(site.announcement)$('#announcement').textContent='✦ '+site.announcement;render()}catch(e){$('#masterGrid').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}}
-$('#serviceGrid').addEventListener('click',e=>{let b=e.target.closest('[data-trade]');if(b){$('#trade').value=b.dataset.trade;visible=6;render();$('#masters').scrollIntoView({behavior:'smooth'})}});['q','city','trade','sort'].forEach(id=>$('#'+id).addEventListener(id==='q'?'input':'change',()=>{visible=6;render()}));$('#region').addEventListener('change',()=>{cityOpts();visible=6;render()});$('#searchBtn').addEventListener('click',()=>{$('#q').value=$('#search').value;render();$('#masters').scrollIntoView({behavior:'smooth'})});$('#search').addEventListener('keydown',e=>{if(e.key==='Enter')$('#searchBtn').click()});$('#masterGrid').addEventListener('click',e=>{let b=e.target.closest('[data-order]');if(b)openOrder(b.dataset.order)});$('#more').addEventListener('click',()=>{visible+=6;render()});$('#close').addEventListener('click',()=>$('#modal').classList.remove('open'));$('#modal').addEventListener('click',e=>{if(e.target===$('#modal'))$('#modal').classList.remove('open')});document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#modal').classList.remove('open')});$('#orderForm').addEventListener('submit',async e=>{e.preventDefault();try{let b=Object.fromEntries(new FormData(e.currentTarget).entries());if(!b.masterId)b.masterId=all[0]?.id;let d=await api('/api/orders',{method:'POST',body:JSON.stringify(b)});$('#formMsg').textContent='Buyurtma qabul qilindi. Raqam: '+d.order.id;$('#formMsg').style.color='green';e.currentTarget.reset();setTimeout(()=>$('#modal').classList.remove('open'),1800)}catch(err){$('#formMsg').textContent=err.message;$('#formMsg').style.color='crimson'}});init();
+const API_URL = 'https://ustatop-bdy4.onrender.com'; // Render backend havolasi
+
+const $=s=>document.querySelector(s),
+      esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+      money=n=>new Intl.NumberFormat('uz-UZ').format(n)+" so'm";
+
+let all=[], trades=[], regions=[], cities={}, visible=6;
+
+async function api(url, opts={}){
+    let r = await fetch(API_URL + url, {
+        headers: {'Content-Type':'application/json'},
+        credentials: 'include', // Sessiyalar to'g'ri ishlashi uchun
+        ...opts
+    });
+    let d = await r.json().catch(()=>({}));
+    if(!r.ok) throw Error(d.error||'Xatolik yuz berdi');
+    return d;
+}
+
+function renderServices(){ 
+    $('#serviceGrid').innerHTML = trades.map(t=>`<button class="service-card" data-trade="${esc(t.key)}"><span class="service-icon">${t.icon}</span><h3>${esc(t.name)}</h3><p>${esc(t.desc)}</p></button>`).join('');
+    $('#trade').innerHTML = '<option value="">Barcha xizmatlar</option>'+trades.map(t=>`<option value="${esc(t.key)}">${esc(t.name)}</option>`).join('');
+}
+
+function cityOpts(){
+    let reg = $('#region').value, arr = reg ? (cities[reg]||[]) : Object.values(cities).flat();
+    $('#city').innerHTML = '<option value="">Barcha shaharlar</option>'+[...new Set(arr)].sort().map(c=>`<option>${esc(c)}</option>`).join('');
+}
+
+function render(){
+    let q = $('#q').value.toLocaleLowerCase('uz'),
+        reg = $('#region').value,
+        city = $('#city').value,
+        trade = $('#trade').value,
+        sort = $('#sort').value;
+
+    let a = all.filter(m=>(!q||[m.name,m.tradeName,m.city,m.region].some(v=>String(v).toLocaleLowerCase('uz').includes(q)))&&(!reg||m.region===reg)&&(!city||m.city===city)&&(!trade||m.trade===trade));
+    
+    if(sort==='rating') a.sort((x,y)=>y.rating-x.rating);
+    if(sort==='price') a.sort((x,y)=>x.price-y.price);
+    if(sort==='experience') a.sort((x,y)=>y.experience-x.experience);
+    
+    $('#count').textContent = a.length+' ta usta topildi';
+    $('#more').style.display = visible>=a.length?'none':'block';
+    
+    let shown = a.slice(0,visible);
+    $('#masterGrid').innerHTML = shown.length ? shown.map(m=>`<article class="master-card"><div class="master-top"><div class="master-avatar">${esc(m.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</div><div><h3 class="master-name">${esc(m.name)} ${m.verified?'✓':''}</h3><div class="master-trade">${esc(m.tradeName)}</div></div><div class="master-rating">★ ${Number(m.rating||0).toFixed(1)}</div></div><div class="master-location">⌖ ${esc(m.city)}, ${esc(m.region)}</div><div class="tags"><span class="tag">${m.experience} yil tajriba</span><span class="tag">${m.reviews||0} baho</span><span class="tag">${m.available?'Faol':'Band bo‘lishi mumkin'}</span></div><div class="price-row"><div class="price">${money(m.price)}<small>taxminiy narxdan</small></div><button class="btn btn-primary" data-order="${m.id}">Buyurtma →</button></div></article>`).join('') : '<div class="empty">Mos usta topilmadi. Filtrlarni o‘zgartirib ko‘ring.</div>';
+}
+
+function openOrder(id){
+    let m = all.find(x=>x.id===+id);
+    $('#masterId').value = m?.id||'';
+    $('#modalTitle').textContent = m ? m.name+'ga buyurtma' : 'Ustani chaqiring';
+    $('#formMsg').textContent = '';
+    $('#modal').classList.add('open');
+}
+
+async function init(){
+    try {
+        let [t, r, m, site] = await Promise.all([
+            api('/api/trades'),
+            api('/api/regions'),
+            api('/api/masters'),
+            api('/api/site')
+        ]);
+        trades = t;
+        regions = r.regions;
+        cities = r.cities;
+        all = m.masters;
+        renderServices();
+        $('#region').innerHTML = '<option value="">Barcha viloyatlar</option>'+regions.map(x=>`<option>${esc(x)}</option>`).join('');
+        cityOpts();
+        if($('#heroMasterCount')) $('#heroMasterCount').textContent = m.total;
+        if(site.announcement) $('#announcement').textContent = '✦ '+site.announcement;
+        render();
+    } catch(e) {
+        $('#masterGrid').innerHTML = '<div class="empty">'+esc(e.message)+'</div>';
+    }
+}
+
+$('#serviceGrid').addEventListener('click',e=>{let b=e.target.closest('[data-trade]');if(b){$('#trade').value=b.dataset.trade;visible=6;render();$('#masters').scrollIntoView({behavior:'smooth'})}});
+['q','city','trade','sort'].forEach(id=>$('#'+id).addEventListener(id==='q'?'input':'change',()=>{visible=6;render()}));
+$('#region').addEventListener('change',()=>{cityOpts();visible=6;render()});
+$('#searchBtn').addEventListener('click',()=>{$('#q').value=$('#search').value;render();$('#masters').scrollIntoView({behavior:'smooth'})});
+$('#search').addEventListener('keydown',e=>{if(e.key==='Enter')$('#searchBtn').click()});
+$('#masterGrid').addEventListener('click',e=>{let b=e.target.closest('[data-order]');if(b)openOrder(b.dataset.order)});
+$('#more').addEventListener('click',()=>{visible+=6;render()});
+$('#close').addEventListener('click',()=>$('#modal').classList.remove('open'));
+$('#modal').addEventListener('click',e=>{if(e.target===$('#modal'))$('#modal').classList.remove('open')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#modal').classList.remove('open')});
+
+$('#orderForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    try {
+        let b = Object.fromEntries(new FormData(e.currentTarget).entries());
+        if(!b.masterId) b.masterId = all[0]?.id;
+        let d = await api('/api/orders',{method:'POST',body:JSON.stringify(b)});
+        $('#formMsg').textContent = 'Buyurtma qabul qilindi. Raqam: '+d.order.id;
+        $('#formMsg').style.color = 'green';
+        e.currentTarget.reset();
+        setTimeout(()=>$('#modal').classList.remove('open'),1800);
+    } catch(err) {
+        $('#formMsg').textContent = err.message;
+        $('#formMsg').style.color = 'crimson';
+    }
+});
+
+init();
