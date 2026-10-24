@@ -1,6 +1,7 @@
 const express=require('express'),session=require('express-session'),bcrypt=require('bcryptjs'),fs=require('fs'),path=require('path');
 const app=express(),PORT=process.env.PORT||3000;
 // CORS ni sozlash (Vercel domeni bilan ishlashi uchun)
+app.set('trust proxy', 1);
 app.use((req, res, next) => {
     // Vercel'dagi saytingiz manzilini yozing (oxirida / bo'lmasin) yoki sinov uchun '*' qo'ysའa ham bo'ladi
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
